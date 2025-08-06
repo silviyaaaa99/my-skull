@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pembayaran Siswa - Excel Import/Export</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .loading { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .drag-over { border-color: #3b82f6 !important; background-color: #eff6ff !important; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b-4 border-blue-500">
+        <div class="container mx-auto px-6 py-4">
+            <h1 class="text-3xl font-bold text-gray-800 text-center">
+                <span class="text-blue-600">💳</span> Sistem Pembayaran Siswa
+            </h1>
+            <p class="text-gray-600 text-center mt-2">SMP Wachid Hasyim 10 Prambon</p>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8 max-w-6xl">
+        <!-- Import Excel Section -->
+        <div id="importSection" class="bg-white rounded-xl shadow-lg mb-8">
+            <!-- Compact Menu Header -->
+            <div id="importMenuHeader" class="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-xl" onclick="toggleImportSection()">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <span class="text-green-500 mr-2 text-xl">📁</span>
+                        <h2 class="text-lg font-semibold text-gray-800">Import Data Excel</h2>
+                        <span class="text-sm text-gray-500 ml-2">(Klik untuk membuka)</span>
+                    </div>
+                    <div class="flex items-center">
+                        <span id="importToggleIcon" class="text-gray-400 text-xl transition-transform">▼</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Expandable Content -->
+            <div id="importContent" class="hidden p-6 pt-0">
+                <!-- Drag & Drop Area -->
+                <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
+                    <div class="flex flex-col items-center">
+                        <span class="text-4xl mb-4">📊</span>
+                        <p class="text-lg font-medium text-gray-700 mb-2">Drag & Drop file Excel di sini</p>
+                        <p class="text-sm text-gray-500 mb-4">atau klik untuk memilih file</p>
+                        <button id="selectFileBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
+                            Pilih File Excel
+                        </button>
+                    </div>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" class="hidden">
+                </div>
+
+                <!-- Import Status -->
+                <div id="importStatus" class="mt-4 hidden">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <span class="text-green-500 text-xl mr-2">✅</span>
+                            <span id="importStatusText" class="text-green-700 font-medium"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div id="exportSection" class="bg-white rounded-xl shadow-lg p-6 mb-8 hidden">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <span class="text-purple-500 mr-2">⚙️</span> Kelola Data
+            </h2>
+            <div class="flex gap-4 justify-center">
+                <button onclick="exportToExcel()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center">
+                    <span class="mr-2">📥</span> Download Excel
+                </button>
+                <button onclick="toggleImportSection()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center">
+                    <span class="mr-2">🔄</span> Perbarui Data Excel
+                </button>
+                <button onclick="clearData()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors flex items-center">
+                    <span class="mr-2">🗑️</span> Hapus Semua Data
+                </button>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div id="searchSection" class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4 flex items-center">
+                <span class="text-blue-500 mr-2">🔍</span> Cari Siswa
+            </h2>
+            <div class="flex gap-4">
+                <input 
+                    type="text" 
+                    id="studentSearch" 
+                    placeholder="Masukkan nama siswa..."
+                    class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none transition-colors"
+                >
+                <button 
+                    onclick="searchStudent()"
+                    id="searchBtn"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-medium transition-colors"
+                >
+                    <span id="searchText">Cari</span>
+                    <span id="searchLoader" class="loading hidden inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full ml-2"></span>
+                </button>
+            </div>
+            
+            <!-- Data Summary -->
+            <div id="dataSummary" class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-blue-50 p-4 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-blue-600" id="totalStudents">0</p>
+                    <p class="text-sm text-gray-600">Total Siswa</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-green-600" id="totalPayments">0</p>
+                    <p class="text-sm text-gray-600">Total Pembayaran</p>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg text-center">
+                    <p class="text-2xl font-bold text-purple-600" id="totalAmount">Rp 0</p>
+                    <p class="text-sm text-gray-600">Total Nominal</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Student Info & Payment Form -->
+        <div id="studentSection" class="hidden fade-in">
+            <!-- Student Info -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="text-green-500 mr-2">👤</span> Informasi Siswa
+                </h3>
+                <div id="studentInfo" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Student info will be populated here -->
+                </div>
+            </div>
+
+            <!-- Add Payment Form -->
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="text-purple-500 mr-2">➕</span> Tambah Pembayaran
+                </h3>
+                <form id="paymentForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Pembayaran</label>
+                        <select id="paymentType" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" onchange="toggleMonthField()">
+                            <option value="">Pilih jenis...</option>
+                            <option value="SPP">SPP</option>
+                            <option value="LKS">LKS</option>
+                            <option value="Daftar Ulang">Daftar Ulang</option>
+                        </select>
+                    </div>
+                    <div id="monthField" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Bulan</label>
+                        <select id="paymentMonth" class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
+                            <option value="">Pilih bulan...</option>
+                            <option value="Januari">Januari</option>
+                            <option value="Februari">Februari</option>
+                            <option value="Maret">Maret</option>
+                            <option value="April">April</option>
+                            <option value="Mei">Mei</option>
+                            <option value="Juni">Juni</option>
+                            <option value="Juli">Juli</option>
+                            <option value="Agustus">Agustus</option>
+                            <option value="September">September</option>
+                            <option value="Oktober">Oktober</option>
+                            <option value="November">November</option>
+                            <option value="Desember">Desember</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Jumlah (Rp)</label>
+                        <input 
+                            type="number" 
+                            id="paymentAmount" 
+                            placeholder="0"
+                            class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        >
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tanggal Pembayaran</label>
+                        <input 
+                            type="date" 
+                            id="paymentDate" 
+                            class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                        >
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-4">
+                        <button 
+                            type="button"
+                            onclick="addPayment()"
+                            id="addPaymentBtn"
+                            class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
+                        >
+                            <span id="addPaymentText">Tambah Pembayaran</span>
+                            <span id="addPaymentLoader" class="loading hidden inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full ml-2"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Payment History -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                    <span class="text-orange-500 mr-2">📋</span> History Pembayaran
+                </h3>
+                <div id="paymentHistory" class="overflow-x-auto">
+                    <!-- Payment history will be populated here -->
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+    <script>
+        let currentStudent = null;
+        let studentsData = {};
+        let paymentsData = [];
+        let dataLoaded = false;
+
+        // Set today's date as default
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('paymentDate').valueAsDate = new Date();
+            loadSavedData();
+            setupFileHandlers();
+        });
+
+        // Load data from localStorage on page load
+        function loadSavedData() {
+            const savedStudents = localStorage.getItem('studentsData');
+            const savedPayments = localStorage.getItem('paymentsData');
+            
+            if (savedStudents && savedPayments) {
+                studentsData = JSON.parse(savedStudents);
+                paymentsData = JSON.parse(savedPayments);
+                dataLoaded = true;
+                
+                console.log('Loaded saved data:', Object.keys(studentsData).length, 'students,', paymentsData.length, 'payments');
+                
+                // Show export section only, search section is always visible
+                document.getElementById('exportSection').classList.remove('hidden');
+                
+                updateDataSummary();
+                showDataLoadedMessage();
+            }
+        }
+
+        // Save data to localStorage
+        function saveDataToStorage() {
+            localStorage.setItem('studentsData', JSON.stringify(studentsData));
+            localStorage.setItem('paymentsData', JSON.stringify(paymentsData));
+            console.log('Data saved to localStorage');
+        }
+
+        function showDataLoadedMessage() {
+            const studentCount = Object.keys(studentsData).length;
+            const paymentCount = paymentsData.length;
+            
+            // Show a welcome message
+            const welcomeDiv = document.createElement('div');
+            welcomeDiv.className = 'bg-green-50 border border-green-200 rounded-lg p-4 mb-6';
+            welcomeDiv.innerHTML = `
+                <div class="flex items-center">
+                    <span class="text-green-500 text-xl mr-2">✅</span>
+                    <span class="text-green-700 font-medium">Data tersimpan: ${studentCount} siswa dan ${paymentCount} pembayaran</span>
+                </div>
+            `;
+            
+            document.querySelector('.container').insertBefore(welcomeDiv, document.getElementById('searchSection'));
+        }
+
+        function setupFileHandlers() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const selectFileBtn = document.getElementById('selectFileBtn');
+
+            // Click to select file
+            selectFileBtn.addEventListener('click', () => fileInput.click());
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            // File input change
+            fileInput.addEventListener('change', handleFileSelect);
+
+            // Drag and drop
+            dropZone.addEventListener('dragover', handleDragOver);
+            dropZone.addEventListener('dragleave', handleDragLeave);
+            dropZone.addEventListener('drop', handleFileDrop);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('dropZone').classList.add('drag-over');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('dropZone').classList.remove('drag-over');
+        }
+
+        function handleFileDrop(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.getElementById('dropZone').classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                processExcelFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processExcelFile(file);
+            }
+        }
+
+        function processExcelFile(file) {
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                alert('Harap pilih file Excel (.xlsx atau .xls)');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    console.log('Available sheets:', workbook.SheetNames);
+                    
+                    // Check if Students sheet exists
+                    if (!workbook.SheetNames.includes('Students')) {
+                        alert('File Excel harus memiliki sheet bernama "Students"');
+                        return;
+                    }
+
+                    // Process Students sheet
+                    const studentsSheet = workbook.Sheets['Students'];
+                    const studentsRows = XLSX.utils.sheet_to_json(studentsSheet, { header: 1 });
+                    console.log('Students data:', studentsRows);
+
+                    // Process Payments sheet (optional)
+                    let paymentsRows = [];
+                    if (workbook.SheetNames.includes('Payments')) {
+                        const paymentsSheet = workbook.Sheets['Payments'];
+                        paymentsRows = XLSX.utils.sheet_to_json(paymentsSheet, { header: 1 });
+                        console.log('Payments data:', paymentsRows);
+                    }
+
+                    // Process the data
+                    processStudentsData(studentsRows);
+                    processPaymentsData(paymentsRows);
+
+                    // Update UI
+                    showImportSuccess();
+                    updateDataSummary();
+                    dataLoaded = true;
+
+                } catch (error) {
+                    console.error('Error processing Excel file:', error);
+                    alert('Error membaca file Excel: ' + error.message);
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processStudentsData(rows) {
+            studentsData = {};
+            let processedCount = 0;
+            
+            // Skip header row, start from index 1
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length < 2) continue; // Skip empty rows
+                
+                const [nis, nama, kelas] = row;
+                if (nis && nama) {
+                    studentsData[nama] = {
+                        nis: String(nis),
+                        name: String(nama),
+                        class: kelas ? String(kelas) : '-'
+                    };
+                    processedCount++;
+                }
+            }
+            
+            console.log(`Processed ${processedCount} students`);
+        }
+
+        function processPaymentsData(rows) {
+            paymentsData = [];
+            let processedCount = 0;
+            
+            // Skip header row, start from index 1
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length < 5) continue; // Skip empty rows
+                
+                const [nis, nama, jenis, bulan, jumlah, tanggal] = row;
+                if (nis && nama && jenis && jumlah) {
+                    paymentsData.push({
+                        nis: String(nis),
+                        name: String(nama),
+                        type: String(jenis),
+                        month: bulan ? String(bulan) : '-',
+                        amount: parseInt(jumlah) || 0,
+                        date: tanggal ? String(tanggal) : new Date().toISOString().split('T')[0],
+                        id: i
+                    });
+                    processedCount++;
+                }
+            }
+            
+            console.log(`Processed ${processedCount} payments`);
+        }
+
+        function showImportSuccess() {
+            const importStatus = document.getElementById('importStatus');
+            const importStatusText = document.getElementById('importStatusText');
+            const searchSection = document.getElementById('searchSection');
+            const exportSection = document.getElementById('exportSection');
+            const importSection = document.getElementById('importSection');
+            
+            const studentCount = Object.keys(studentsData).length;
+            const paymentCount = paymentsData.length;
+            
+            // Save data to localStorage
+            saveDataToStorage();
+            
+            importStatusText.textContent = `Berhasil import ${studentCount} siswa dan ${paymentCount} pembayaran - Data tersimpan otomatis`;
+            importStatus.classList.remove('hidden');
+            
+            // Show export section after successful import
+            setTimeout(() => {
+                exportSection.classList.remove('hidden');
+            }, 2000);
+        }
+
+        function updateDataSummary() {
+            const totalStudents = Object.keys(studentsData).length;
+            const totalPayments = paymentsData.length;
+            const totalAmount = paymentsData.reduce((sum, payment) => sum + payment.amount, 0);
+            
+            document.getElementById('totalStudents').textContent = totalStudents;
+            document.getElementById('totalPayments').textContent = totalPayments;
+            document.getElementById('totalAmount').textContent = `Rp ${totalAmount.toLocaleString('id-ID')}`;
+        }
+
+        function searchStudent() {
+            if (!dataLoaded) {
+                alert('Harap import file Excel terlebih dahulu');
+                return;
+            }
+
+            const searchTerm = document.getElementById('studentSearch').value.trim();
+            
+            if (!searchTerm) {
+                alert('Masukkan nama siswa untuk mencari');
+                return;
+            }
+
+            showLoader('search', true);
+
+            setTimeout(() => {
+                // Search for student (case insensitive)
+                const foundStudentName = Object.keys(studentsData).find(name => 
+                    name.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+
+                if (foundStudentName) {
+                    currentStudent = studentsData[foundStudentName];
+                    currentStudent.payments = paymentsData.filter(p => p.nis === currentStudent.nis);
+                    
+                    displayStudentInfo();
+                    displayPaymentHistory();
+                    document.getElementById('studentSection').classList.remove('hidden');
+                } else {
+                    alert('Siswa tidak ditemukan. Coba nama lain atau periksa ejaan.');
+                    document.getElementById('studentSection').classList.add('hidden');
+                }
+                
+                showLoader('search', false);
+            }, 300);
+        }
+
+        function displayStudentInfo() {
+            const studentInfo = document.getElementById('studentInfo');
+            studentInfo.innerHTML = `
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">Nama</p>
+                    <p class="font-semibold text-gray-800">${currentStudent.name}</p>
+                </div>
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">Kelas</p>
+                    <p class="font-semibold text-gray-800">${currentStudent.class}</p>
+                </div>
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">NIS</p>
+                    <p class="font-semibold text-gray-800">${currentStudent.nis}</p>
+                </div>
+            `;
+        }
+
+        function displayPaymentHistory() {
+            const paymentHistory = document.getElementById('paymentHistory');
+            
+            if (currentStudent.payments.length === 0) {
+                paymentHistory.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <span class="text-4xl">📝</span>
+                        <p class="mt-2">Belum ada history pembayaran</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const totalPaid = currentStudent.payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+            paymentHistory.innerHTML = `
+                <div class="mb-4 p-4 bg-green-50 rounded-lg">
+                    <p class="text-sm text-gray-600">Total Pembayaran</p>
+                    <p class="text-2xl font-bold text-green-600">Rp ${totalPaid.toLocaleString('id-ID')}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th class="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Jenis</th>
+                                <th class="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Bulan</th>
+                                <th class="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Jumlah</th>
+                                <th class="border border-gray-300 px-4 py-3 text-left font-semibold text-gray-700">Tanggal</th>
+                                <th class="border border-gray-300 px-4 py-3 text-center font-semibold text-gray-700">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${currentStudent.payments.map(payment => `
+                                <tr class="hover:bg-gray-50">
+                                    <td class="border border-gray-300 px-4 py-3">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentTypeColor(payment.type)}">
+                                            ${payment.type}
+                                        </span>
+                                    </td>
+                                    <td class="border border-gray-300 px-4 py-3">${payment.month}</td>
+                                    <td class="border border-gray-300 px-4 py-3 font-semibold">Rp ${payment.amount.toLocaleString('id-ID')}</td>
+                                    <td class="border border-gray-300 px-4 py-3">${formatDateDisplay(payment.date)}</td>
+                                    <td class="border border-gray-300 px-4 py-3 text-center">
+                                        <button 
+                                            onclick="deletePayment(${payment.id})"
+                                            class="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                                            title="Hapus pembayaran ini"
+                                        >
+                                            🗑️ Hapus
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        function addPayment() {
+            if (!currentStudent) {
+                alert('Pilih siswa terlebih dahulu');
+                return;
+            }
+
+            const type = document.getElementById('paymentType').value;
+            const month = document.getElementById('paymentMonth').value;
+            const amount = parseInt(document.getElementById('paymentAmount').value);
+            const date = document.getElementById('paymentDate').value;
+
+            // Validation
+            if (!type) {
+                alert('Pilih jenis pembayaran');
+                return;
+            }
+            if (type === 'SPP' && !month) {
+                alert('Pilih bulan untuk pembayaran SPP');
+                return;
+            }
+            if (!amount || amount <= 0) {
+                alert('Masukkan jumlah pembayaran yang valid');
+                return;
+            }
+            if (!date) {
+                alert('Pilih tanggal pembayaran');
+                return;
+            }
+
+            // Check for duplicate SPP payment
+            if (type === 'SPP') {
+                const existingPayment = currentStudent.payments.find(p => 
+                    p.type === 'SPP' && p.month === month
+                );
+                if (existingPayment) {
+                    alert(`SPP untuk bulan ${month} sudah dibayar`);
+                    return;
+                }
+            }
+
+            showLoader('addPayment', true);
+
+            setTimeout(() => {
+                // Add to local data
+                const newPayment = {
+                    nis: currentStudent.nis,
+                    name: currentStudent.name,
+                    type: type,
+                    month: type === 'SPP' ? month : '-',
+                    amount: amount,
+                    date: date,
+                    id: Date.now()
+                };
+
+                currentStudent.payments.push(newPayment);
+                paymentsData.push(newPayment);
+                
+                // Clear form
+                document.getElementById('paymentForm').reset();
+                document.getElementById('paymentDate').valueAsDate = new Date();
+                document.getElementById('monthField').classList.add('hidden');
+                
+                // Save updated data to localStorage
+                saveDataToStorage();
+                
+                // Refresh display
+                displayPaymentHistory();
+                updateDataSummary();
+                
+                alert('Pembayaran berhasil ditambahkan dan tersimpan!');
+                showLoader('addPayment', false);
+            }, 300);
+        }
+
+        function exportToExcel() {
+            if (!dataLoaded) {
+                alert('Tidak ada data untuk di-export');
+                return;
+            }
+
+            try {
+                // Create new workbook
+                const wb = XLSX.utils.book_new();
+
+                // Prepare Students data
+                const studentsArray = [['NIS', 'Nama', 'Kelas']];
+                Object.values(studentsData).forEach(student => {
+                    studentsArray.push([student.nis, student.name, student.class]);
+                });
+
+                // Prepare Payments data
+                const paymentsArray = [['NIS', 'Nama', 'Jenis', 'Bulan', 'Jumlah', 'Tanggal']];
+                paymentsData.forEach(payment => {
+                    paymentsArray.push([
+                        payment.nis,
+                        payment.name,
+                        payment.type,
+                        payment.month,
+                        payment.amount,
+                        payment.date
+                    ]);
+                });
+
+                // Create worksheets
+                const studentsWs = XLSX.utils.aoa_to_sheet(studentsArray);
+                const paymentsWs = XLSX.utils.aoa_to_sheet(paymentsArray);
+
+                // Add worksheets to workbook
+                XLSX.utils.book_append_sheet(wb, studentsWs, 'Students');
+                XLSX.utils.book_append_sheet(wb, paymentsWs, 'Payments');
+
+                // Generate filename with current date
+                const now = new Date();
+                const dateStr = now.toISOString().split('T')[0];
+                const filename = `Data_Pembayaran_Siswa_${dateStr}.xlsx`;
+
+                // Save file
+                XLSX.writeFile(wb, filename);
+                
+                alert(`File berhasil di-download: ${filename}`);
+
+            } catch (error) {
+                console.error('Error exporting to Excel:', error);
+                alert('Error saat export ke Excel: ' + error.message);
+            }
+        }
+
+        function deletePayment(paymentId) {
+            if (confirm('Yakin ingin menghapus pembayaran ini?')) {
+                // Remove from current student payments
+                currentStudent.payments = currentStudent.payments.filter(p => p.id !== paymentId);
+                
+                // Remove from global payments data
+                paymentsData = paymentsData.filter(p => p.id !== paymentId);
+                
+                // Save updated data to localStorage
+                saveDataToStorage();
+                
+                // Refresh display
+                displayPaymentHistory();
+                updateDataSummary();
+                
+                alert('Pembayaran berhasil dihapus!');
+            }
+        }
+
+        function toggleImportSection() {
+            const importContent = document.getElementById('importContent');
+            const toggleIcon = document.getElementById('importToggleIcon');
+            
+            if (importContent.classList.contains('hidden')) {
+                // Show import section
+                importContent.classList.remove('hidden');
+                toggleIcon.textContent = '▲';
+                toggleIcon.style.transform = 'rotate(180deg)';
+                
+                // Clear previous status and file input
+                document.getElementById('importStatus').classList.add('hidden');
+                document.getElementById('fileInput').value = '';
+            } else {
+                // Hide import section
+                importContent.classList.add('hidden');
+                toggleIcon.textContent = '▼';
+                toggleIcon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function showImportSection() {
+            if (confirm('Perbarui data akan mengganti data yang sudah ada. Lanjutkan?')) {
+                // Open import section if closed
+                const importContent = document.getElementById('importContent');
+                if (importContent.classList.contains('hidden')) {
+                    toggleImportSection();
+                }
+                
+                // Clear file input and status
+                document.getElementById('importStatus').classList.add('hidden');
+                document.getElementById('fileInput').value = '';
+                
+                // Scroll to import section
+                document.getElementById('importSection').scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        function clearData() {
+            if (confirm('Yakin ingin menghapus semua data? Tindakan ini tidak dapat dibatalkan.')) {
+                studentsData = {};
+                paymentsData = [];
+                currentStudent = null;
+                dataLoaded = false;
+                
+                // Clear localStorage
+                localStorage.removeItem('studentsData');
+                localStorage.removeItem('paymentsData');
+                
+                // Reset UI - keep search section visible, hide others
+                document.getElementById('importStatus').classList.add('hidden');
+                document.getElementById('exportSection').classList.add('hidden');
+                document.getElementById('studentSection').classList.add('hidden');
+                document.getElementById('fileInput').value = '';
+                
+                // Remove welcome message if exists
+                const welcomeDiv = document.querySelector('.bg-green-50.border-green-200');
+                if (welcomeDiv) {
+                    welcomeDiv.remove();
+                }
+                
+                alert('Semua data berhasil dihapus');
+            }
+        }
+
+        function getPaymentTypeColor(type) {
+            switch(type) {
+                case 'SPP': return 'bg-blue-100 text-blue-800';
+                case 'LKS': return 'bg-green-100 text-green-800';
+                case 'Daftar Ulang': return 'bg-purple-100 text-purple-800';
+                default: return 'bg-gray-100 text-gray-800';
+            }
+        }
+
+        function formatDateDisplay(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+
+
+
+        function toggleMonthField() {
+            const paymentType = document.getElementById('paymentType').value;
+            const monthField = document.getElementById('monthField');
+            
+            if (paymentType === 'SPP') {
+                monthField.classList.remove('hidden');
+                document.getElementById('paymentMonth').required = true;
+            } else {
+                monthField.classList.add('hidden');
+                document.getElementById('paymentMonth').required = false;
+                document.getElementById('paymentMonth').value = '';
+            }
+        }
+
+        function showLoader(type, show) {
+            const textElement = document.getElementById(type + 'Text');
+            const loaderElement = document.getElementById(type + 'Loader');
+            
+            if (show) {
+                textElement.style.display = 'none';
+                loaderElement.classList.remove('hidden');
+            } else {
+                textElement.style.display = 'inline';
+                loaderElement.classList.add('hidden');
+            }
+        }
+
+        // Allow search on Enter key
+        document.getElementById('studentSearch').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchStudent();
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96b12673a7ed8bc5',t:'MTc1NDUxMDczOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
